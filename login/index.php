@@ -31,6 +31,7 @@ redirect_if_major_upgrade_required();
 
 $testsession = optional_param('testsession', 0, PARAM_INT); // test session works properly
 $anchor      = optional_param('anchor', '', PARAM_RAW);     // Used to restore hash anchor to wantsurl.
+$redirect    = optional_param('redirect', 1, PARAM_BOOL);   // Used to bypass alternateloginurl.
 
 $resendconfirmemail = optional_param('resendconfirmemail', false, PARAM_BOOL);
 
@@ -271,6 +272,9 @@ if ($frm and isset($frm->username)) {                             // Login WITH 
         // Discard any errors before the last redirect.
         unset($SESSION->loginerrormsg);
 
+        // Discard redirect if we are redirecting away.
+        unset($SESSION->redirect);
+
         // test the session actually works by redirecting to self
         $SESSION->wantsurl = $urltogo;
         redirect(new moodle_url(get_login_url(), array('testsession'=>$USER->id)));
@@ -308,8 +312,14 @@ if (empty($SESSION->wantsurl)) {
     }
 }
 
+// Check if redirect is set in the SESSION.
+if ($errorcode && isset($SESSION->redirect)) {
+    $redirect = $SESSION->redirect;
+}
+$SESSION->redirect = $redirect;
+
 /// Redirect to alternative login URL if needed
-if (!empty($CFG->alternateloginurl)) {
+if (!empty($CFG->alternateloginurl)  && $redirect) {
     $loginurl = new moodle_url($CFG->alternateloginurl);
 
     $loginurlstr = $loginurl->out(false);
@@ -358,7 +368,15 @@ if (!empty($SESSION->loginerrormsg)) {
     if ($errormsg) {
         $SESSION->loginerrormsg = $errormsg;
     }
-    redirect(new moodle_url('/login/index.php'));
+
+    // Add redirect param to url.
+    $loginurl = new moodle_url('/login/index.php');
+
+    if (isset($SESSION->redirect)) {
+        $loginurl->param('redirect', $SESSION->redirect);
+    }
+
+    redirect($loginurl->out(false));
 }
 
 $PAGE->set_title("$site->fullname: $loginsite");
